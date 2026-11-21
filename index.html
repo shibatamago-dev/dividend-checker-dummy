@@ -1,0 +1,1496 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>配当の質チェッカー 試作</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+    <style>
+      button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) { min-height: 2.25rem; }
+    </style>
+    <style>
+      :root {
+        --bg: #f4f6f3;
+        --surface: #ffffff;
+        --surface-2: #edf1ec;
+        --ink: #1b241e;
+        --muted: #5d6d62;
+        --line: #d9e1d8;
+        --accent: #14684a;
+        --accent-strong: #0d4f37;
+        --accent-soft: #e2efe7;
+        --good: #177245;
+        --good-bg: #e0f1e5;
+        --slow: #8a5f00;
+        --slow-bg: #fbf0cd;
+        --flat: #b03627;
+        --flat-bg: #fae6e1;
+        --warn: #a35a00;
+        --warn-bg: #fdeeda;
+        --unknown: #5d6d62;
+        --unknown-bg: #e8ece8;
+        --chart-line: #14684a;
+        --chart-grid: #dde5dc;
+        --shadow: 0 1px 2px rgba(20, 40, 28, .06), 0 8px 24px rgba(20, 40, 28, .06);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #10140f;
+          --surface: #171d17;
+          --surface-2: #1f2820;
+          --ink: #e9efe9;
+          --muted: #9db1a2;
+          --line: #2c382d;
+          --accent: #57bd8d;
+          --accent-strong: #7fd3a9;
+          --accent-soft: #1d2f24;
+          --good: #6fce9b;
+          --good-bg: #173324;
+          --slow: #e3b959;
+          --slow-bg: #38300f;
+          --flat: #f08a7a;
+          --flat-bg: #3c211b;
+          --warn: #eda54e;
+          --warn-bg: #38280f;
+          --unknown: #9db1a2;
+          --unknown-bg: #232b23;
+          --chart-line: #57bd8d;
+          --chart-grid: #2c382d;
+          --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 56px; }
+      h1 { font-size: 26px; font-weight: 900; letter-spacing: .02em; margin: 4px 0 6px; line-height: 1.3; }
+      .lead { color: var(--muted); margin: 0 0 18px; max-width: 46em; }
+      .lead strong { color: var(--ink); }
+
+      /* --- upload --- */
+      .dropzone {
+        border: 2px dashed var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 22px 18px;
+        text-align: center;
+        transition: border-color .15s, background .15s;
+      }
+      .dropzone.drag { border-color: var(--accent); background: var(--accent-soft); }
+      .dropzone p { margin: 0 0 4px; font-weight: 700; }
+      .dropzone .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+      .dz-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+      .btn {
+        appearance: none; border: 1px solid var(--line); background: var(--surface);
+        color: var(--ink); border-radius: 10px; padding: 8px 16px; font: inherit;
+        font-weight: 700; font-size: 14px; cursor: pointer; min-height: 40px;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .btn:hover { border-color: var(--accent); }
+      .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      @media (prefers-color-scheme: dark) { .btn.primary { color: #0c1710; } }
+      .btn.primary:hover { background: var(--accent-strong); }
+      .btn.ghost { background: transparent; }
+      .btn.small { min-height: 36px; padding: 4px 12px; font-size: 13px; }
+      input[type="file"] { display: none; }
+      .notice {
+        margin-top: 12px; border-radius: 10px; padding: 10px 14px; font-size: 14px; display: none;
+      }
+      .notice.error { display: block; background: var(--flat-bg); color: var(--flat); }
+      .notice.ok { display: block; background: var(--good-bg); color: var(--good); }
+
+      /* --- meta strip --- */
+      .meta {
+        display: none; flex-wrap: wrap; gap: 8px 22px; margin: 16px 2px 0;
+        font-size: 13.5px; color: var(--muted);
+      }
+      .meta.show { display: flex; }
+      .meta b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+      /* --- overview visuals --- */
+      .overview { display: none; margin-top: 18px; }
+      .overview.show { display: block; }
+      .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+      .kpi {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        padding: 12px 14px 10px; box-shadow: var(--shadow);
+      }
+      .kpi .k-label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .02em; }
+      .kpi .k-value { font-size: 26px; font-weight: 900; line-height: 1.15; font-variant-numeric: tabular-nums; }
+      .kpi .k-value small { font-size: 14px; font-weight: 700; }
+      .kpi .k-sub { font-size: 12px; color: var(--muted); }
+      .kpi.accent .k-value { color: var(--accent-strong); }
+      .kpi.warn-kpi .k-value { color: var(--warn); }
+      .viz-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 12px; }
+      .viz-card {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+        box-shadow: var(--shadow); padding: 16px 18px 14px;
+      }
+      .viz-card h2 { font-size: 14px; margin: 0 0 2px; font-weight: 900; }
+      .viz-card .viz-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+      .cmp-row {
+        display: grid; grid-template-columns: 128px 1fr 62px; gap: 10px; align-items: center;
+        width: 100%; background: none; border: none; border-top: 1px solid var(--line);
+        padding: 8px 2px; font: inherit; color: var(--ink); cursor: pointer; text-align: left; min-height: 40px;
+      }
+      .cmp-row:first-of-type { border-top: none; }
+      .cmp-row:hover { background: var(--surface-2); }
+      .cmp-row.selected { background: var(--accent-soft); }
+      .cmp-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cmp-name span { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+      .cmp-track { position: relative; height: 18px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+      .cmp-track .th3 { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .35; }
+      .cmp-fill { height: 100%; border-radius: 5px; min-width: 3px; }
+      .cmp-fill.good { background: var(--good); }
+      .cmp-fill.slow { background: #c99a1e; }
+      .cmp-fill.flat { background: var(--flat); }
+      .cmp-fill.unknown { background: var(--unknown); }
+      .cmp-val { font-size: 13.5px; font-weight: 900; text-align: right; font-variant-numeric: tabular-nums; }
+      .cmp-note { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; }
+      .stack-bar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
+      .stack-seg.good { background: var(--good); }
+      .stack-seg.slow { background: #c99a1e; }
+      .stack-seg.flat { background: var(--flat); }
+      .stack-seg.unknown { background: var(--unknown); opacity: .55; }
+      .legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 7px; }
+      .legend li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      .legend .dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+      .legend .dot.good { background: var(--good); } .legend .dot.slow { background: #c99a1e; }
+      .legend .dot.flat { background: var(--flat); } .legend .dot.unknown { background: var(--unknown); }
+      .legend b { margin-left: auto; font-variant-numeric: tabular-nums; }
+      .legend .pct { color: var(--muted); font-size: 12px; width: 3.2em; text-align: right; }
+      .decel-callout {
+        margin-top: 14px; border-radius: 10px; padding: 10px 12px; font-size: 13px;
+        background: var(--warn-bg); color: var(--warn); font-weight: 700; display: none;
+      }
+      .decel-callout.show { display: block; }
+      .decel-callout button { background: none; border: none; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; padding: 0; min-height: 0; font-weight: 900; }
+      .spark { display: block; max-width: 100%; height: auto; }
+      .cagr-cell { position: relative; }
+      .cagr-bar { display: block; height: 4px; border-radius: 2px; margin-top: 3px; margin-left: auto; max-width: 64px; }
+      .cagr-bar.good { background: var(--good); } .cagr-bar.slow { background: #c99a1e; } .cagr-bar.flat { background: var(--flat); }
+      .detail-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+      .dstat { background: var(--surface-2); border-radius: 10px; padding: 8px 13px; font-size: 12px; color: var(--muted); font-weight: 700; }
+      .dstat b { display: block; font-size: 17px; color: var(--ink); line-height: 1.2; font-variant-numeric: tabular-nums; }
+      .charts-3 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+      @media (max-width: 760px) {
+        .kpi-row { grid-template-columns: repeat(2, 1fr); }
+        .viz-grid { grid-template-columns: 1fr; }
+        .charts-3 { grid-template-columns: 1fr; }
+        .cmp-row { grid-template-columns: 104px 1fr 56px; }
+      }
+
+      /* --- valuation --- */
+      .val-section { display: none; margin-top: 18px; }
+      .val-section.show { display: block; }
+      .val-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; }
+      .scatter-wrap svg { width: 100%; height: auto; display: block; }
+      .scatter-wrap .axis { font-size: 11px; fill: var(--muted); }
+      .scatter-wrap .quad { font-size: 11px; fill: var(--muted); font-weight: 700; }
+      .scatter-wrap .theory-label { font-size: 11.5px; fill: var(--accent-strong); font-weight: 900; }
+      .scatter-wrap .region-up { font-size: 11.5px; fill: var(--flat); font-weight: 700; }
+      .scatter-wrap .region-down { font-size: 11.5px; fill: var(--good); font-weight: 700; }
+      .scatter-wrap .pt-label { font-size: 12.5px; fill: var(--ink); font-weight: 700; }
+      .scatter-wrap .ref-label { font-size: 10.5px; fill: var(--muted); }
+      .val-table { width: 100%; font-size: 13px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      .val-table th, .val-table td { text-align: right; padding: 6px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      .val-table th { font-size: 12px; color: var(--muted); font-weight: 700; }
+      .val-table th:first-child, .val-table td:first-child { text-align: left; padding-left: 2px; }
+      .val-table tbody tr { cursor: pointer; }
+      .val-table tbody tr:hover { background: var(--surface-2); }
+      .val-table tbody tr.selected { background: var(--accent-soft); }
+      .val-note { font-size: 13.5px; margin: 0 0 10px; }
+      .val-note:last-child { margin-bottom: 0; }
+      .val-detail { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+      .val-detail h3 { font-size: 15px; margin: 0 0 10px; font-weight: 900; }
+      .yield-band { position: relative; height: 30px; margin: 30px 6px 4px; }
+      .yield-track { position: absolute; left: 0; right: 0; top: 12px; height: 6px; border-radius: 3px; background: var(--surface-2); }
+      .yield-range { position: absolute; top: 9px; height: 12px; border-radius: 6px; background: var(--accent-soft); border: 1px solid var(--accent); }
+      .yield-hist { position: absolute; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .45; transform: translateX(-3px); }
+      .yield-med { position: absolute; top: 4px; width: 2px; height: 22px; background: var(--ink); opacity: .55; transform: translateX(-1px); }
+      .yield-cur { position: absolute; top: 15px; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); border: 2.5px solid var(--surface); box-shadow: 0 0 0 1.5px var(--accent); transform: translate(-50%, -50%); }
+      .yield-cur-label { position: absolute; top: -24px; transform: translateX(-50%); font-size: 12.5px; font-weight: 900; color: var(--accent-strong); white-space: nowrap; }
+      .yield-scale { position: relative; height: 18px; margin: 0 6px; font-size: 11.5px; color: var(--muted); }
+      .yield-scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .yield-scale span:first-child { transform: none; }
+      .yield-scale span:last-child { transform: translateX(-100%); }
+      @media (max-width: 760px) { .val-grid { grid-template-columns: 1fr; } }
+
+      /* --- sustainability --- */
+      .sustain-detail { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+      .sustain-detail h3 { font-size: 15px; margin: 0 0 6px; font-weight: 900; }
+      .sustain-summary { font-size: 13.5px; margin: 0 0 12px; }
+      .sustain-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .sustain-grid .chart-box h4 { font-size: 13.5px; margin: 0 0 4px; font-weight: 700; }
+      .sustain-grid .chart-box .chart-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 8px; }
+      .sustain-grid svg { width: 100%; height: auto; display: block; }
+      .sustain-grid .axis { font-size: 11px; fill: var(--muted); }
+      .sustain-grid .val { font-size: 11px; fill: var(--ink); font-weight: 700; }
+      .sustain-na {
+        border: 1px dashed var(--line); border-radius: 10px; padding: 16px 14px;
+        font-size: 13.5px; background: var(--surface-2); min-height: 120px;
+      }
+      .sustain-na strong { display: block; font-size: 15px; margin-bottom: 4px; }
+      .sustain-notes { margin: 14px 0 0; padding-left: 1.2em; font-size: 13px; color: var(--muted); }
+      .sustain-notes li { margin-bottom: 4px; }
+      .sustain-notes strong { color: var(--ink); }
+      @media (max-width: 760px) { .sustain-grid { grid-template-columns: 1fr; } }
+
+      /* --- safety check --- */
+      .safety-detail { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+      .safety-detail h3 { font-size: 15px; margin: 0 0 6px; font-weight: 900; }
+      .safety-summary { font-size: 13.5px; margin: 0 0 12px; }
+      .safe-table { width: 100%; font-size: 13.5px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      .safe-table th, .safe-table td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      .safe-table th { font-size: 12px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+      .safe-table td.safe-val { text-align: right; white-space: nowrap; font-weight: 700; }
+      .safe-table td.safe-flag { text-align: right; white-space: nowrap; }
+      .safe-table td.safe-note { color: var(--muted); font-size: 12.5px; }
+      .safe-badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+      .safe-badge.ok { background: var(--good-bg); color: var(--good); }
+      .safe-badge.caution { background: var(--flat-bg); color: var(--flat); }
+      .safe-badge.ref { background: var(--unknown-bg); color: var(--unknown); }
+      @media (max-width: 760px) {
+        .safe-table thead { display: none; }
+        .safe-table, .safe-table tbody, .safe-table tr, .safe-table td { display: block; width: 100%; }
+        .safe-table tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+        .safe-table td { border-bottom: none; padding: 2px 4px; }
+        .safe-table td.safe-val, .safe-table td.safe-flag { text-align: left; }
+      }
+
+      /* --- toolbar --- */
+      .toolbar {
+        display: none; flex-wrap: wrap; gap: 10px; align-items: center;
+        margin: 18px 0 12px;
+      }
+      .toolbar.show { display: flex; }
+      .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+      .fchip {
+        border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+        border-radius: 999px; padding: 4px 13px; font: inherit; font-size: 13px; font-weight: 700;
+        cursor: pointer; min-height: 36px;
+      }
+      .fchip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+      .toolbar .spacer { flex: 1; }
+      .toolbar label { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+      .toolbar select, .toolbar input[type="search"] {
+        font: inherit; font-size: 14px; color: var(--ink); background: var(--surface);
+        border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-height: 38px;
+      }
+      .toolbar input[type="search"] { width: 170px; }
+
+      /* --- table --- */
+      .table-card {
+        display: none; background: var(--surface); border: 1px solid var(--line);
+        border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
+      }
+      .table-card.show { display: block; }
+      table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+      thead th {
+        text-align: right; font-size: 12.5px; color: var(--muted); font-weight: 700;
+        padding: 12px 12px 8px; border-bottom: 1px solid var(--line); white-space: nowrap;
+        background: var(--surface);
+      }
+      thead th:first-child { text-align: left; padding-left: 16px; }
+      tbody td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+      tbody td:first-child { text-align: left; padding-left: 16px; white-space: normal; }
+      tbody tr { cursor: pointer; }
+      tbody tr:hover { background: var(--surface-2); }
+      tbody tr.selected { background: var(--accent-soft); }
+      tbody tr:last-child td { border-bottom: none; }
+      .stock-name { font-weight: 700; }
+      .stock-code { color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+      .num { font-variant-numeric: tabular-nums; }
+      .cagr { font-weight: 700; }
+      .token-mark { color: var(--warn); font-weight: 700; }
+      .flag {
+        display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px;
+        padding: 1px 8px; background: var(--warn-bg); color: var(--warn); white-space: nowrap;
+      }
+      .flag.none { background: transparent; color: var(--muted); font-weight: 400; }
+      .verdict {
+        display: inline-block; font-size: 13px; font-weight: 700; border-radius: 999px;
+        padding: 3px 12px; white-space: nowrap;
+      }
+      .verdict.good { background: var(--good-bg); color: var(--good); }
+      .verdict.slow { background: var(--slow-bg); color: var(--slow); }
+      .verdict.flat { background: var(--flat-bg); color: var(--flat); }
+      .verdict.unknown { background: var(--unknown-bg); color: var(--unknown); }
+
+      /* --- mobile cards --- */
+      .cards { display: none; }
+      .stock-card {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+        box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+        text-align: left; width: 100%; font: inherit; color: var(--ink); min-height: 44px;
+      }
+      .stock-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+      .stock-card .row1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .stock-card .row2 {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px;
+        font-size: 13px; color: var(--muted);
+      }
+      .stock-card .row2 b { display: block; color: var(--ink); font-size: 15px; }
+      .stock-card .row3 { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+
+      /* --- detail --- */
+      .detail {
+        display: none; margin-top: 18px; background: var(--surface); border: 1px solid var(--line);
+        border-radius: 14px; box-shadow: var(--shadow); padding: 20px;
+      }
+      .detail.show { display: block; }
+      .detail h2 { margin: 0 0 2px; font-size: 20px; font-weight: 900; }
+      .detail .dsub { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; }
+      .charts { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+      .chart-box h3 { font-size: 14px; margin: 0 0 8px; font-weight: 700; }
+      .chart-box svg { width: 100%; height: auto; display: block; }
+      .chart-box .axis { font-size: 11px; fill: var(--muted); }
+      .chart-box .val { font-size: 11.5px; fill: var(--ink); font-weight: 700; }
+      .yearly { margin-top: 20px; }
+      .yearly table { width: 100%; font-size: 13.5px; }
+      .yearly td, .yearly th { padding: 8px 6px; }
+      .yearly td, .yearly th { text-align: right; }
+      .yearly td:first-child, .yearly th:first-child { text-align: left; padding-left: 4px; }
+      .yearly thead th { padding-left: 12px; }
+      .yearly thead th:first-child { padding-left: 4px; }
+      .token-dot {
+        display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--warn);
+        background: var(--warn-bg); border-radius: 6px; padding: 0 7px; margin-left: 8px; white-space: nowrap;
+      }
+      .empty { display: none; text-align: center; color: var(--muted); padding: 34px 10px; }
+      .empty.show { display: block; }
+
+      /* --- info sections --- */
+      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px; }
+      .info-card {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+      }
+      .info-card h2 { font-size: 16px; margin: 0 0 10px; font-weight: 900; }
+      .info-card p, .info-card li { font-size: 14px; }
+      .info-card ul { margin: 0; padding-left: 1.2em; }
+      .info-card li { margin-bottom: 4px; }
+      .info-card table { font-size: 13.5px; }
+      .info-card th, .info-card td { text-align: left; padding: 4px 10px 4px 0; border: none; white-space: normal; cursor: default; }
+      pre {
+        background: var(--surface-2); border-radius: 10px; padding: 12px 14px; font-size: 12.5px;
+        overflow-x: auto; line-height: 1.55; margin: 10px 0 0;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      }
+      code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .92em; }
+      .foot { margin-top: 26px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
+      .foot p { margin: 0 0 6px; }
+
+      @media (max-width: 760px) {
+        .table-card.show { display: none; }
+        .cards.show { display: block; }
+        .charts { grid-template-columns: 1fr; }
+        .info-grid { grid-template-columns: 1fr; }
+        h1 { font-size: 23px; }
+        .toolbar input[type="search"] { width: 100%; }
+        .toolbar .spacer { display: none; }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .detail.show { animation: rise .18s ease-out; }
+        @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>配当の質チェッカー</h1>
+      <p class="lead">
+        連続増配の「年数」だけでは分からない、増配の中身を見るための試作ツールです。
+        年度DPSのCSVを読み込むと、<strong>10年・5年・3年CAGR</strong>、増配幅が1円以下の
+        <strong>トークン年</strong>、長期と直近の差から見る<strong>減速注意</strong>を計算し、
+        <strong>全銘柄の比較グラフと判定の内訳</strong>で一目で分かるように表示します。
+        あわせて、サンプル5銘柄については<strong>ROE×PBRの散布図</strong>（理論PBRの線で「割安候補」の領域も表示）と、利回りを
+        <strong>その銘柄自身の過去レンジ</strong>と比べる表示で、「稼ぐ力の割に評価が高いか低いか」も見られます。
+        さらに銘柄詳細には、債務超過・自己資本比率・インタレスト・カバレッジなどから倒産リスク側を見る
+        <strong>安全度チェック</strong>と、配当性向の推移とFCFカバー（フリーキャッシュフローで配当を賄えているか）から見る
+        <strong>配当の持続性</strong>も付けています（割安かどうかと安全かどうか、配当が続くかどうかはそれぞれ別の話です）。
+        計算はすべてこのブラウザの中で行い、ファイルが外部に送信されることはありません。
+      </p>
+
+      <section class="dropzone" id="dropzone" aria-label="CSVアップロード">
+        <p>年度DPSのCSVをドロップ、または選択してください</p>
+        <p class="sub">形式: <code>code,name,fy,dps,fetched_at</code>（下の「CSVの形式」に説明と生成方法があります）</p>
+        <div class="dz-actions">
+          <button type="button" class="btn primary" id="pickBtn">CSVファイルを選ぶ</button>
+          <input type="file" id="fileInput" accept=".csv,text/csv,text/plain" hidden />
+          <button type="button" class="btn" id="sampleBtn">サンプルで試す（5銘柄）</button>
+          <button type="button" class="btn ghost" id="downloadSampleBtn">サンプルCSVをダウンロード</button>
+        </div>
+        <div class="notice" id="notice" role="status"></div>
+      </section>
+
+      <div class="meta" id="meta"></div>
+
+      <section class="overview" id="overview" aria-label="全体の概要グラフ"></section>
+
+      <div class="toolbar" id="toolbar">
+        <div class="chip-group" role="group" aria-label="判定で絞り込む">
+          <button type="button" class="fchip" data-judge="しっかり増配" aria-pressed="true">しっかり増配</button>
+          <button type="button" class="fchip" data-judge="ゆるやか" aria-pressed="true">ゆるやか</button>
+          <button type="button" class="fchip" data-judge="実質横ばい" aria-pressed="true">実質横ばい</button>
+          <button type="button" class="fchip" data-judge="データ不足" aria-pressed="true">データ不足</button>
+        </div>
+        <button type="button" class="fchip" id="decelChip" aria-pressed="false">減速注意のみ</button>
+        <div class="spacer"></div>
+        <input type="search" id="query" placeholder="コード・銘柄名で検索" aria-label="コード・銘柄名で検索" />
+        <label>並び替え
+          <select id="sortSel" aria-label="並び替え">
+            <option value="cagr3">3年CAGRが高い順</option>
+            <option value="cagr5">5年CAGRが高い順</option>
+            <option value="cagr10">10年CAGRが高い順</option>
+            <option value="token">トークン年が少ない順</option>
+            <option value="streak">連続増配年数が長い順</option>
+            <option value="code">コード順</option>
+          </select>
+        </label>
+        <button type="button" class="btn small ghost" id="clearBtn">クリア</button>
+      </div>
+
+      <section class="table-card" id="tableCard" aria-label="銘柄一覧">
+        <table>
+          <thead>
+            <tr>
+              <th>銘柄</th><th>DPS推移</th><th>最新年度</th><th>最新DPS</th>
+              <th>10年CAGR</th><th>5年CAGR</th><th>3年CAGR</th>
+              <th>トークン年<br />（直近5年）</th><th>連続増配</th><th>減速注意</th><th>判定</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </section>
+      <div class="cards" id="cards"></div>
+      <p class="empty" id="emptyMsg">条件に合う銘柄がありません。絞り込みを変えてみてください。</p>
+
+      <section class="detail" id="detail" aria-label="銘柄の詳細"></section>
+
+      <section class="val-section" id="valuation" aria-label="PER・PBR・ROEの散布図"></section>
+
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>判定の基準</h2>
+          <p>主軸は直近3年CAGRです（生成スクリプト <code>dividend_quality.py</code> と同じ基準）。</p>
+          <table>
+            <tr><th>しっかり増配</th><td>3年CAGR が 3%以上</td></tr>
+            <tr><th>ゆるやか</th><td>3年CAGR が 1%以上 3%未満</td></tr>
+            <tr><th>実質横ばい</th><td>3年CAGR が 1%未満</td></tr>
+            <tr><th>減速注意</th><td>10年CAGR が 3%以上なのに、3年CAGR が 2%未満</td></tr>
+            <tr><th>トークン年</th><td>直近5年のうち、前年からの増配幅が1円以下（分割調整後）だった年の数</td></tr>
+          </table>
+          <p>トークン年は金額ベースの目安なので、率（CAGR）と必ずセットで見てください。DPSが小さい銘柄では1円でも大きな率になりえます。</p>
+        </section>
+        <section class="info-card">
+          <h2>CSVの形式</h2>
+          <p>1行が「1銘柄 × 1年度」です。<code>fy</code> は決算年度（3月決算なら期末の年）、<code>dps</code> は分割調整後の年間1株配当（円）。未完成の年度（期末配当が未確定の年）は含めないでください。</p>
+          <pre>code,name,fy,dps,fetched_at
+DUM-A,ハルカ食品,2024,84.0,サンプルデータ
+DUM-A,ハルカ食品,2025,85.0,サンプルデータ</pre>
+          <p>データの生成は手作業ではなく、取得スクリプト側で行う想定です。</p>
+          <pre>python dividend_quality.py --csv dividends_snapshot.csv</pre>
+          <ul>
+            <li>分割調整・決算期での年度集計・未完成年度の除外はスクリプト側で済ませます</li>
+            <li>CAGRの計算には最大で11年分（10年前〜最新年度）の行が必要です</li>
+          </ul>
+        </section>
+      </div>
+
+      <footer class="foot">
+        <p>扱うのは過去の配当実績のみで、配当予想は含みません。判定は上記の機械的な基準による目安であり、投資の推奨ではありません。</p>
+        <p>読み込んだCSVはこのブラウザの中だけで処理され、保存も送信もされません。サンプルは検証用5銘柄（ハルカ食品・ノゾミ通信・カケルキャピタル・ソラ部品・ユメ流通）の架空のサンプルデータです。</p>
+        <p>PER・PBR・ROE・配当性向は架空のサンプルデータで、サンプル5銘柄分のみです。年度別利回りは各年度末の株価（分割調整後）でDPSを割った概算であり、現在の株価水準とは時点が異なります。</p>
+        <p>安全度チェックの指標も架空のサンプルデータで、サンプル5銘柄分のみです。安全度は倒産・上場廃止リスクの目安にすぎず、継続企業の前提に関する注記（GC注記）や上場維持基準（流通株式時価総額・流通株式比率など）はこのデータでは確認していません。</p>
+        <p>配当の持続性（配当性向・FCFカバー）も架空のサンプルデータで、サンプル5銘柄分のみです。配当性向はDPS÷EPS、FCFカバーは1株フリーキャッシュフロー÷DPSで計算した過去実績の目安であり、将来の減配・増配を予測するものではありません。ハルカ食品のFY2025のFCFカバーはサンプルデータでは当該年度のキャッシュフローが未収録のため表示していません。カケルキャピタルのFCFカバーは、リース・金融業ではフリーキャッシュフロー自体が配当の原資を表さないため対象外とし、配当性向のみを表示しています。</p>
+      </footer>
+    </main>
+
+    <script>
+    (function () {
+      "use strict";
+
+      var SAMPLE_CSV = [
+        "code,name,fy,dps,fetched_at",
+        "DUM-A,ハルカ食品,2015,52.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2016,58.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2017,64.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2018,69.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2019,73.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2020,77.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2021,80.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2022,82.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2023,83.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2024,84.0,サンプルデータ",
+        "DUM-A,ハルカ食品,2025,85.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2016,30.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2017,34.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2018,38.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2019,43.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2020,48.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2021,52.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2022,57.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2023,63.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2024,69.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2025,75.0,サンプルデータ",
+        "DUM-B,ノゾミ通信,2026,82.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2016,18.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2017,20.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2018,23.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2019,26.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2020,28.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2021,31.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2022,34.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2023,38.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2024,42.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2025,47.0,サンプルデータ",
+        "DUM-C,カケルキャピタル,2026,52.0,サンプルデータ",
+        "DUM-D,ソラ部品,2016,12.0,サンプルデータ",
+        "DUM-D,ソラ部品,2017,14.0,サンプルデータ",
+        "DUM-D,ソラ部品,2018,16.0,サンプルデータ",
+        "DUM-D,ソラ部品,2019,19.0,サンプルデータ",
+        "DUM-D,ソラ部品,2020,21.0,サンプルデータ",
+        "DUM-D,ソラ部品,2021,24.0,サンプルデータ",
+        "DUM-D,ソラ部品,2022,28.0,サンプルデータ",
+        "DUM-D,ソラ部品,2023,33.0,サンプルデータ",
+        "DUM-D,ソラ部品,2024,39.0,サンプルデータ",
+        "DUM-D,ソラ部品,2025,46.0,サンプルデータ",
+        "DUM-D,ソラ部品,2026,55.0,サンプルデータ",
+        "DUM-E,ユメ流通,2016,25.0,サンプルデータ",
+        "DUM-E,ユメ流通,2017,27.0,サンプルデータ",
+        "DUM-E,ユメ流通,2018,30.0,サンプルデータ",
+        "DUM-E,ユメ流通,2019,32.0,サンプルデータ",
+        "DUM-E,ユメ流通,2020,35.0,サンプルデータ",
+        "DUM-E,ユメ流通,2021,38.0,サンプルデータ",
+        "DUM-E,ユメ流通,2022,41.0,サンプルデータ",
+        "DUM-E,ユメ流通,2023,45.0,サンプルデータ",
+        "DUM-E,ユメ流通,2024,49.0,サンプルデータ",
+        "DUM-E,ユメ流通,2025,54.0,サンプルデータ",
+        "DUM-E,ユメ流通,2026,60.0,サンプルデータ"
+      ].join("\n");
+
+      /* Valuation snapshot (サンプルデータ、架空). PER/PBR/ROE/payout are point-in-time
+         values; yieldSeries is DPS / split-adjusted close near each fiscal year-end (approximate). */
+      var VALUATION = {
+        fetchedAt: "サンプルデータ",
+        stocks: {
+          "DUM-A": { name: "ハルカ食品", price: 3200.0, per: 18.82, pbr: 2.29, roe: 12.14, payout: 50.0, perRoe: 2.28, yieldCur: 2.66, yMin: 2.48, yMed: 2.7, yMax: 2.76,
+            yieldSeries: [[2015,2.48],[2016,2.52],[2017,2.56],[2018,2.65],[2019,2.7],[2020,2.75],[2021,2.76],[2022,2.73],[2023,2.72],[2024,2.71],[2025,2.66]] },
+          "DUM-B": { name: "ノゾミ通信", price: 2400.0, per: 17.14, pbr: 2.67, roe: 15.56, payout: 58.6, perRoe: 2.67, yieldCur: 3.42, yMin: 2.5, yMed: 2.82, yMax: 3.42,
+            yieldSeries: [[2016,2.5],[2017,2.62],[2018,2.71],[2019,2.77],[2020,2.82],[2021,2.81],[2022,2.85],[2023,2.93],[2024,3.07],[2025,3.19],[2026,3.42]] },
+          "DUM-C": { name: "カケルキャピタル", price: 1100.0, per: 12.22, pbr: 0.92, roe: 7.5, payout: 57.8, perRoe: 0.92, yieldCur: 4.73, yMin: 2.57, yMed: 3.26, yMax: 4.73,
+            yieldSeries: [[2016,2.57],[2017,2.67],[2018,2.88],[2019,3.06],[2020,3.11],[2021,3.26],[2022,3.4],[2023,3.73],[2024,4.0],[2025,4.35],[2026,4.73]] },
+          "DUM-D": { name: "ソラ部品", price: 1500.0, per: 12.5, pbr: 2.5, roe: 20.0, payout: 45.8, perRoe: 2.5, yieldCur: 3.67, yMin: 2.4, yMed: 3.0, yMax: 3.67,
+            yieldSeries: [[2016,2.4],[2017,2.55],[2018,2.67],[2019,2.92],[2020,3.0],[2021,3.0],[2022,3.11],[2023,3.3],[2024,3.25],[2025,3.41],[2026,3.67]] },
+          "DUM-E": { name: "ユメ流通", price: 1800.0, per: 16.36, pbr: 2.25, roe: 13.75, payout: 54.5, perRoe: 2.25, yieldCur: 3.33, yMin: 2.78, yMed: 2.93, yMax: 3.33,
+            yieldSeries: [[2016,2.78],[2017,2.84],[2018,3.0],[2019,2.91],[2020,2.92],[2021,2.92],[2022,2.93],[2023,3.0],[2024,2.97],[2025,3.09],[2026,3.33]] }
+        }
+      };
+
+      /* Safety snapshot (サンプルデータ、架空、safety_snapshot.json).
+         Flags: "ok" = 問題なし / "caution" = 注意 / "ref" = 参考外（判定対象外）.
+         Caution criteria: negative equity; equity ratio < 10% (non-financial);
+         interest coverage < 2x; operating CF negative 2+ consecutive years (non-financial);
+         debt repayment years (interest-bearing debt / operating CF) > 10.
+         Current ratio is shown as a value only — levels differ too much by business type
+         (例：前受金などが流動負債に入る業態では低く出ます) to judge by. */
+      var SAFETY = {
+        fetchedAt: "サンプルデータ",
+        stocks: {
+          "DUM-A": { negativeEquity: false, equityRatio: 58.0, interestCoverage: 38.5, opCfAllPositive: true, debtRepayYears: 1.5, currentRatio: 1.8,
+            opCfNote: "営業CFはサンプルデータでは2025年度分が未収録のため、2024年度が最新です（取得できた全年度プラス）。" },
+          "DUM-B": { negativeEquity: false, equityRatio: 30.0, interestCoverage: 28.0, opCfAllPositive: true, debtRepayYears: 2.8, currentRatio: 0.7 },
+          "DUM-C": { negativeEquity: false, equityRatio: 14.0, interestCoverage: null, opCfAllPositive: false, debtRepayYears: null, currentRatio: 1.5, financial: true },
+          "DUM-D": { negativeEquity: false, equityRatio: 65.0, interestCoverage: 55.0, opCfAllPositive: true, debtRepayYears: 2.0, currentRatio: 2.2 },
+          "DUM-E": { negativeEquity: false, equityRatio: 48.0, interestCoverage: 22.0, opCfAllPositive: true, debtRepayYears: 3.0, currentRatio: 1.6 }
+        }
+      };
+
+      /* Sustainability snapshot (サンプルデータ、架空、sustainability_snapshot.json).
+         payout = DPS / EPS (%). fcfCover = FCF per share / DPS (x); null = no data for that year.
+         カケルキャピタル: FCF cover is not meaningful for leasing/finance (fcfNA) — payout only. */
+      var SUSTAINABILITY = {
+        fetchedAt: "サンプルデータ",
+        stocks: {
+          "DUM-A": { years: [
+            { fy: 2022, payout: 68.3, fcf: 0.85 },
+            { fy: 2023, payout: 87.4, fcf: 1.45 },
+            { fy: 2024, payout: 56.0, fcf: 1.55 },
+            { fy: 2025, payout: 50.0, fcf: null }
+          ], fcfMissingNote: "FY2025のFCFカバーは、サンプルデータでは当該年度のキャッシュフローが未収録のためデータなしです。" },
+          "DUM-B": { years: [
+            { fy: 2023, payout: 57.3, fcf: 1.43 },
+            { fy: 2024, payout: 55.2, fcf: 1.59 },
+            { fy: 2025, payout: 57.7, fcf: 1.33 },
+            { fy: 2026, payout: 58.6, fcf: 1.46 }
+          ] },
+          "DUM-C": { years: [
+            { fy: 2023, payout: 54.3, fcf: null },
+            { fy: 2024, payout: 52.5, fcf: null },
+            { fy: 2025, payout: 55.3, fcf: null },
+            { fy: 2026, payout: 57.8, fcf: null }
+          ], fcfNA: true },
+          "DUM-D": { years: [
+            { fy: 2023, payout: 41.2, fcf: 1.52 },
+            { fy: 2024, payout: 41.1, fcf: 1.54 },
+            { fy: 2025, payout: 43.8, fcf: 1.2 },
+            { fy: 2026, payout: 45.8, fcf: 1.27 }
+          ] },
+          "DUM-E": { years: [
+            { fy: 2023, payout: 52.9, fcf: 1.33 },
+            { fy: 2024, payout: 54.4, fcf: 1.43 },
+            { fy: 2025, payout: 54.0, fcf: 1.2 },
+            { fy: 2026, payout: 54.5, fcf: 1.33 }
+          ] }
+        }
+      };
+
+      var state = {
+        stocks: [],
+        sourceLabel: "",
+        fetchedDates: [],
+        totalRows: 0,
+        skippedRows: 0,
+        filters: { "しっかり増配": true, "ゆるやか": true, "実質横ばい": true, "データ不足": true },
+        decelOnly: false,
+        query: "",
+        sort: "cagr3",
+        selected: null
+      };
+
+      var $ = function (id) { return document.getElementById(id); };
+      var els = {
+        dropzone: $("dropzone"), fileInput: $("fileInput"), notice: $("notice"),
+        meta: $("meta"), toolbar: $("toolbar"), tbody: $("tbody"),
+        tableCard: $("tableCard"), cards: $("cards"), empty: $("emptyMsg"),
+        detail: $("detail"), query: $("query"), sortSel: $("sortSel"),
+        decelChip: $("decelChip"), overview: $("overview"), valuation: $("valuation")
+      };
+
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+      function fmtPct(v) {
+        if (v === null || v === undefined || isNaN(v)) return "—";
+        return (v * 100).toFixed(2) + "%";
+      }
+      function fmtYen(v) {
+        if (v === null || v === undefined || isNaN(v)) return "—";
+        var r = Math.round(v * 100) / 100;
+        return (r % 1 === 0 ? String(r) : r.toFixed(2)) + "円";
+      }
+      function fmtSignedYen(v) {
+        var s = v > 0 ? "+" : (v < 0 ? "−" : "±");
+        return s + fmtYen(Math.abs(v)).replace("円", "") + "円";
+      }
+
+      /* ---------- CSV parsing ---------- */
+      function parseCSV(text) {
+        var rows = [], row = [], field = "", inQ = false, i, c;
+        text = text.replace(/^\uFEFF/, "");
+        for (i = 0; i < text.length; i++) {
+          c = text[i];
+          if (inQ) {
+            if (c === '"') {
+              if (text[i + 1] === '"') { field += '"'; i++; }
+              else inQ = false;
+            } else field += c;
+          } else if (c === '"') {
+            inQ = true;
+          } else if (c === ",") {
+            row.push(field); field = "";
+          } else if (c === "\n" || c === "\r") {
+            if (c === "\r" && text[i + 1] === "\n") i++;
+            row.push(field); field = "";
+            rows.push(row); row = [];
+          } else field += c;
+        }
+        if (field !== "" || row.length) { row.push(field); rows.push(row); }
+        return rows.filter(function (r) {
+          return r.length > 1 || (r.length === 1 && r[0].trim() !== "");
+        });
+      }
+
+      function loadCSV(text, sourceLabel) {
+        var rows = parseCSV(text);
+        if (!rows.length) throw new Error("CSVにデータ行がありません。");
+        var header = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+        var idx = {};
+        ["code", "name", "fy", "dps"].forEach(function (col) {
+          idx[col] = header.indexOf(col);
+          if (idx[col] < 0) throw new Error("必須列「" + col + "」がヘッダーにありません。形式は code,name,fy,dps,fetched_at です。");
+        });
+        idx.fetched = header.indexOf("fetched_at");
+
+        var byCode = {}, order = [], skipped = 0, total = 0, dates = {};
+        for (var r = 1; r < rows.length; r++) {
+          var cells = rows[r];
+          var code = (cells[idx.code] || "").trim();
+          var name = (cells[idx.name] || "").trim();
+          var fy = parseInt((cells[idx.fy] || "").trim(), 10);
+          var dps = parseFloat((cells[idx.dps] || "").trim());
+          if (!code || isNaN(fy) || isNaN(dps) || dps < 0) { skipped++; continue; }
+          total++;
+          if (!byCode[code]) { byCode[code] = { code: code, name: name || code, series: {} }; order.push(code); }
+          if (name) byCode[code].name = name;
+          byCode[code].series[fy] = dps;
+          if (idx.fetched >= 0) {
+            var d = (cells[idx.fetched] || "").trim();
+            if (d) dates[d] = true;
+          }
+        }
+        var stocks = order.map(function (code) { return analyse(byCode[code]); })
+          .filter(function (s) { return Object.keys(s.series).length > 0; });
+        if (!stocks.length) throw new Error("有効な行がありませんでした（code / fy / dps を確認してください）。");
+
+        state.stocks = stocks;
+        state.sourceLabel = sourceLabel;
+        state.fetchedDates = Object.keys(dates).sort();
+        state.totalRows = total;
+        state.skippedRows = skipped;
+        state.selected = null;
+        renderAll();
+      }
+
+      /* ---------- analysis (same rules as dividend_quality.py) ---------- */
+      function cagr(start, end, years) {
+        if (start <= 0 || end < 0) return null;
+        return Math.pow(end / start, 1 / years) - 1;
+      }
+      function analyse(stock) {
+        var fys = Object.keys(stock.series).map(Number).sort(function (a, b) { return a - b; });
+        var last = fys[fys.length - 1];
+        var s = stock.series;
+        stock.lastFy = last;
+        stock.lastDps = s[last];
+        stock.cagr10 = (last - 10) in s ? cagr(s[last - 10], s[last], 10) : null;
+        stock.cagr5 = (last - 5) in s ? cagr(s[last - 5], s[last], 5) : null;
+        stock.cagr3 = (last - 3) in s ? cagr(s[last - 3], s[last], 3) : null;
+        var token = 0;
+        for (var fy = last - 4; fy <= last; fy++) {
+          if ((fy - 1) in s && fy in s && s[fy] - s[fy - 1] <= 1.0 + 1e-9) token++;
+        }
+        stock.tokenYears = token;
+        stock.decel = stock.cagr10 !== null && stock.cagr3 !== null &&
+          stock.cagr10 >= 0.03 && stock.cagr3 < 0.02;
+        var streak = 0;
+        for (var y = last; y - 1 >= fys[0]; y--) {
+          if ((y - 1) in s && s[y] > s[y - 1]) streak++;
+          else break;
+        }
+        stock.streak = streak;
+        if (stock.cagr3 === null) stock.judgement = "データ不足";
+        else if (stock.cagr3 >= 0.03) stock.judgement = "しっかり増配";
+        else if (stock.cagr3 >= 0.01) stock.judgement = "ゆるやか";
+        else stock.judgement = "実質横ばい";
+        return stock;
+      }
+
+      function verdictClass(j) {
+        return j === "しっかり増配" ? "good" : j === "ゆるやか" ? "slow" :
+               j === "実質横ばい" ? "flat" : "unknown";
+      }
+
+      /* ---------- filtering / sorting ---------- */
+      function visibleStocks() {
+        var q = state.query.trim().toLowerCase();
+        var list = state.stocks.filter(function (s) {
+          if (!state.filters[s.judgement]) return false;
+          if (state.decelOnly && !s.decel) return false;
+          if (q && s.code.toLowerCase().indexOf(q) < 0 && s.name.toLowerCase().indexOf(q) < 0) return false;
+          return true;
+        });
+        var key = state.sort;
+        list.sort(function (a, b) {
+          if (key === "code") return a.code < b.code ? -1 : 1;
+          if (key === "token") return a.tokenYears - b.tokenYears || (b.cagr3 || -9) - (a.cagr3 || -9);
+          if (key === "streak") return b.streak - a.streak;
+          var av = a[key], bv = b[key];
+          if (av === null || av === undefined) av = -Infinity;
+          if (bv === null || bv === undefined) bv = -Infinity;
+          return bv - av;
+        });
+        return list;
+      }
+
+      function barClass(v) {
+        if (v === null || v === undefined) return "unknown";
+        return v >= 0.03 ? "good" : v >= 0.01 ? "slow" : "flat";
+      }
+      function sparklineSVG(s, w, h) {
+        w = w || 96; h = h || 30;
+        var fys = Object.keys(s.series).map(Number).sort(function (a, b) { return a - b; });
+        if (fys.length < 2) return "";
+        var vals = fys.map(function (f) { return s.series[f]; });
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+        var range = (max - min) || 1;
+        var px = function (i) { return (3 + (w - 6) * i / (fys.length - 1)).toFixed(1); };
+        var py = function (v) { return (h - 4 - (h - 8) * (v - min) / range).toFixed(1); };
+        var pts = fys.map(function (f, i) { return px(i) + "," + py(s.series[f]); }).join(" ");
+        var area = "3," + (h - 2) + " " + pts + " " + (w - 3) + "," + (h - 2);
+        var col = s.decel ? "var(--warn)" : "var(--chart-line)";
+        return "<svg class=\"spark\" width=\"" + w + "\" height=\"" + h + "\" viewBox=\"0 0 " + w + " " + h + "\" aria-hidden=\"true\">" +
+          "<polygon points=\"" + area + "\" fill=\"" + col + "\" opacity=\"0.14\"/>" +
+          "<polyline points=\"" + pts + "\" fill=\"none\" stroke=\"" + col + "\" stroke-width=\"2\" stroke-linejoin=\"round\"/>" +
+          "<circle cx=\"" + px(fys.length - 1) + "\" cy=\"" + py(vals[vals.length - 1]) + "\" r=\"3\" fill=\"" + col + "\"/></svg>";
+      }
+
+      function renderOverview() {
+        var el = els.overview;
+        if (!state.stocks.length) { el.className = "overview"; el.innerHTML = ""; return; }
+        var list = visibleStocks();
+        var total = state.stocks.length;
+        var withCagr = state.stocks.filter(function (s) { return s.cagr3 !== null; });
+        var avg3 = withCagr.length ? withCagr.reduce(function (a, s) { return a + s.cagr3; }, 0) / withCagr.length : null;
+        var goodN = state.stocks.filter(function (s) { return s.judgement === "しっかり増配"; }).length;
+        var decelN = state.stocks.filter(function (s) { return s.decel; }).length;
+        var counts = {};
+        state.stocks.forEach(function (s) { counts[s.judgement] = (counts[s.judgement] || 0) + 1; });
+
+        var sorted = list.slice().filter(function (s) { return s.cagr3 !== null; })
+          .sort(function (a, b) { return b.cagr3 - a.cagr3; });
+        var maxC = 0.05;
+        sorted.forEach(function (s) { maxC = Math.max(maxC, Math.abs(s.cagr3)); });
+        var th3x = (0.03 / maxC * 100).toFixed(1);
+        var cmpHtml = sorted.map(function (s) {
+          var wPct = Math.max(Math.abs(s.cagr3) / maxC * 100, 2).toFixed(1);
+          return "<button type=\"button\" class=\"cmp-row" + (state.selected === s.code ? " selected" : "") + "\" data-code=\"" + esc(s.code) + "\">" +
+            "<span class=\"cmp-name\">" + esc(s.name) + "<span>" + esc(s.code) + (s.decel ? " ・ 減速注意" : "") + "</span></span>" +
+            "<span class=\"cmp-track\"><span class=\"cmp-fill " + barClass(s.cagr3) + "\" style=\"display:block;width:" + wPct + "%\"></span><span class=\"th3\" style=\"left:" + th3x + "%\"></span></span>" +
+            "<span class=\"cmp-val\">" + fmtPct(s.cagr3) + "</span></button>";
+        }).join("");
+        if (!cmpHtml) cmpHtml = "<p class=\"viz-sub\">表示できる3年CAGRがありません。</p>";
+
+        var order = [["しっかり増配", "good"], ["ゆるやか", "slow"], ["実質横ばい", "flat"], ["データ不足", "unknown"]];
+        var stackHtml = order.map(function (o) {
+          var n = counts[o[0]] || 0; if (!n) return "";
+          return "<span class=\"stack-seg " + o[1] + "\" style=\"width:" + (n / total * 100) + "%\"></span>";
+        }).join("");
+        var legendHtml = order.map(function (o) {
+          var n = counts[o[0]] || 0; if (!n) return "";
+          return "<li><span class=\"dot " + o[1] + "\"></span>" + o[0] + "<span class=\"pct\">" + Math.round(n / total * 100) + "%</span><b>" + n + "銘柄</b></li>";
+        }).join("");
+
+        el.innerHTML =
+          "<div class=\"kpi-row\">" +
+          "<div class=\"kpi\"><div class=\"k-label\">対象銘柄</div><div class=\"k-value\">" + total + "<small> 銘柄</small></div><div class=\"k-sub\">表示中 " + list.length + "銘柄</div></div>" +
+          "<div class=\"kpi accent\"><div class=\"k-label\">しっかり増配</div><div class=\"k-value\">" + goodN + "<small> / " + total + "</small></div><div class=\"k-sub\">全体の " + (total ? Math.round(goodN / total * 100) : 0) + "% ・ 3年CAGR 3%以上</div></div>" +
+          "<div class=\"kpi\"><div class=\"k-label\">平均 3年CAGR</div><div class=\"k-value\">" + (avg3 === null ? "—" : fmtPct(avg3)) + "</div><div class=\"k-sub\">全銘柄の平均（直近の伸び）</div></div>" +
+          "<div class=\"kpi warn-kpi\"><div class=\"k-label\">減速注意</div><div class=\"k-value\">" + decelN + "<small> 銘柄</small></div><div class=\"k-sub\">長期好調でも直近が鈍化</div></div>" +
+          "</div>" +
+          "<div class=\"viz-grid\">" +
+          "<div class=\"viz-card\"><h2>全銘柄の比較 — 3年CAGR</h2><p class=\"viz-sub\">バーが長いほど直近3年の増配ペースが速い。黒い線が「しっかり増配」の境目（3%）。行を選ぶと下に詳細グラフが出ます。</p>" +
+          cmpHtml + "<p class=\"cmp-note\">色: 緑 = 3%以上 ／ 黄 = 1〜3% ／ 赤 = 1%未満</p></div>" +
+          "<div class=\"viz-card\"><h2>判定の内訳</h2><p class=\"viz-sub\">「年数」ではなく直近の伸びで分けた割合です。</p>" +
+          "<div class=\"stack-bar\">" + stackHtml + "</div><ul class=\"legend\">" + legendHtml + "</ul>" +
+          "<div class=\"decel-callout" + (decelN ? " show" : "") + "\">⚠ 減速注意が " + decelN + "銘柄あります。<button type=\"button\" id=\"ovDecelBtn\">減速注意だけ見る</button></div>" +
+          "</div></div>";
+        el.className = "overview show";
+        Array.prototype.forEach.call(el.querySelectorAll("[data-code]"), function (node) {
+          node.addEventListener("click", function () { selectStock(node.getAttribute("data-code")); });
+        });
+        var db = document.getElementById("ovDecelBtn");
+        if (db) db.addEventListener("click", function () {
+          if (!state.decelOnly) els.decelChip.click();
+        });
+      }
+
+      /* ---------- rendering ---------- */
+      function renderMeta() {
+        if (!state.stocks.length) { els.meta.className = "meta"; els.meta.innerHTML = ""; return; }
+        var counts = {};
+        state.stocks.forEach(function (s) { counts[s.judgement] = (counts[s.judgement] || 0) + 1; });
+        var parts = ["<span>データ: <b>" + esc(state.sourceLabel) + "</b></span>",
+          "<span><b>" + state.stocks.length + "</b> 銘柄 / <b>" + state.totalRows + "</b> 行</span>"];
+        if (state.fetchedDates.length) {
+          var d = state.fetchedDates;
+          parts.push("<span>取得日: <b>" + esc(d[0]) + (d.length > 1 ? " 〜 " + esc(d[d.length - 1]) : "") + "</b></span>");
+        }
+        ["しっかり増配", "ゆるやか", "実質横ばい", "データ不足"].forEach(function (j) {
+          if (counts[j]) parts.push("<span>" + j + ": <b>" + counts[j] + "</b></span>");
+        });
+        if (state.skippedRows) parts.push("<span>読み飛ばした行: <b>" + state.skippedRows + "</b></span>");
+        els.meta.innerHTML = parts.join("");
+        els.meta.className = "meta show";
+      }
+
+      function renderList() {
+        var has = state.stocks.length > 0;
+        els.toolbar.className = "toolbar" + (has ? " show" : "");
+        els.tableCard.className = "table-card" + (has ? " show" : "");
+        els.cards.className = "cards" + (has ? " show" : "");
+        if (!has) { els.empty.className = "empty"; return; }
+        var list = visibleStocks();
+        els.empty.className = "empty" + (list.length ? "" : " show");
+
+        els.tbody.innerHTML = list.map(function (s) {
+          function cagrCell(v) {
+            var w = v === null ? 0 : Math.min(Math.abs(v) / 0.20 * 100, 100);
+            return "<td class=\"cagr\">" + fmtPct(v) + (v === null ? "" : "<span class=\"cagr-bar " + barClass(v) + "\" style=\"width:" + Math.max(w, 4) + "%\"></span>") + "</td>";
+          }
+          return "<tr data-code=\"" + esc(s.code) + "\" class=\"" + (state.selected === s.code ? "selected" : "") + "\">" +
+            "<td><span class=\"stock-name\">" + esc(s.name) + "</span><span class=\"stock-code\">" + esc(s.code) + "</span></td>" +
+            "<td>" + sparklineSVG(s, 92, 30) + "</td>" +
+            "<td>FY" + s.lastFy + "</td>" +
+            "<td class=\"num\">" + fmtYen(s.lastDps) + "</td>" +
+            cagrCell(s.cagr10) + cagrCell(s.cagr5) + cagrCell(s.cagr3) +
+            "<td>" + (s.tokenYears > 0 ? "<span class=\"token-mark\">" + s.tokenYears + "年</span>" : "0年") + "</td>" +
+            "<td>" + s.streak + "年</td>" +
+            "<td>" + (s.decel ? "<span class=\"flag\">減速注意</span>" : "<span class=\"flag none\">—</span>") + "</td>" +
+            "<td><span class=\"verdict " + verdictClass(s.judgement) + "\">" + s.judgement + "</span></td></tr>";
+        }).join("");
+
+        els.cards.innerHTML = list.map(function (s) {
+          return "<button type=\"button\" class=\"stock-card" + (state.selected === s.code ? " selected" : "") + "\" data-code=\"" + esc(s.code) + "\">" +
+            "<span class=\"row1\"><span><span class=\"stock-name\">" + esc(s.name) + "</span><span class=\"stock-code\">" + esc(s.code) + "</span></span>" +
+            "<span class=\"verdict " + verdictClass(s.judgement) + "\">" + s.judgement + "</span></span>" +
+            "<span style=\"display:block;margin-top:10px\">" + sparklineSVG(s, 300, 44) + "</span>" +
+            "<span class=\"row2\">" +
+            "<span>10年CAGR<b>" + fmtPct(s.cagr10) + "</b></span>" +
+            "<span>5年CAGR<b>" + fmtPct(s.cagr5) + "</b></span>" +
+            "<span>3年CAGR<b>" + fmtPct(s.cagr3) + "</b></span></span>" +
+            "<span class=\"row3\"><span>最新DPS " + fmtYen(s.lastDps) + "（FY" + s.lastFy + "）</span>" +
+            "<span>トークン年 " + s.tokenYears + "年</span><span>連続増配 " + s.streak + "年</span>" +
+            (s.decel ? "<span class=\"flag\">減速注意</span>" : "") + "</span></button>";
+        }).join("");
+
+        Array.prototype.forEach.call(document.querySelectorAll("[data-code]"), function (node) {
+          node.addEventListener("click", function () { selectStock(node.getAttribute("data-code")); });
+        });
+      }
+
+      function lineChartSVG(s) {
+        var fys = Object.keys(s.series).map(Number).sort(function (a, b) { return a - b; });
+        var W = 560, H = 230, pl = 46, pr = 14, pt = 16, pb = 30;
+        var iw = W - pl - pr, ih = H - pt - pb;
+        var vals = fys.map(function (f) { return s.series[f]; });
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+        var pad = (max - min) * 0.15 || 1;
+        min = Math.max(0, min - pad); max = max + pad;
+        function X(i) { return pl + (fys.length === 1 ? iw / 2 : iw * i / (fys.length - 1)); }
+        function Y(v) { return pt + ih * (1 - (v - min) / (max - min)); }
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"DPS推移グラフ\">";
+        for (var g = 0; g <= 3; g++) {
+          var gv = min + (max - min) * g / 3, gy = Y(gv);
+          out += "<line x1=\"" + pl + "\" y1=\"" + gy + "\" x2=\"" + (W - pr) + "\" y2=\"" + gy + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>" +
+            "<text class=\"axis\" x=\"" + (pl - 6) + "\" y=\"" + (gy + 4) + "\" text-anchor=\"end\">" + (Math.round(gv * 10) / 10) + "</text>";
+        }
+        var pts = fys.map(function (f, i) { return X(i).toFixed(1) + "," + Y(s.series[f]).toFixed(1); }).join(" ");
+        var areaPts = pl + "," + (pt + ih) + " " + pts + " " + (W - pr) + "," + (pt + ih);
+        out += "<polygon points=\"" + areaPts + "\" fill=\"var(--chart-line)\" opacity=\"0.12\"/>";
+        out += "<polyline points=\"" + pts + "\" fill=\"none\" stroke=\"var(--chart-line)\" stroke-width=\"2.5\" stroke-linejoin=\"round\"/>";
+        fys.forEach(function (f, i) {
+          var prev = s.series[f - 1];
+          var isToken = prev !== undefined && (s.series[f] - prev) <= 1.0 + 1e-9 && i > 0;
+          var dotFill = isToken ? "var(--warn)" : "var(--chart-line)";
+          out += "<circle cx=\"" + X(i) + "\" cy=\"" + Y(s.series[f]) + "\" r=\"" + (isToken ? 5 : 3.5) + "\" fill=\"" + dotFill + "\"" + (isToken ? " stroke=\"var(--surface)\" stroke-width=\"1.5\"" : "") + "/>" +
+            "<text class=\"axis\" x=\"" + X(i) + "\" y=\"" + (H - 8) + "\" text-anchor=\"middle\">" + f + "</text>";
+          if (i === 0 || i === fys.length - 1 || isToken) {
+            out += "<text class=\"val\" x=\"" + X(i) + "\" y=\"" + (Y(s.series[f]) - 10) + "\" text-anchor=\"middle\">" + (Math.round(s.series[f] * 100) / 100) + "</text>";
+          }
+        });
+        return out + "</svg>";
+      }
+
+      function cagrBarSVG(s) {
+        var items = [["10年CAGR", s.cagr10], ["5年CAGR", s.cagr5], ["3年CAGR", s.cagr3]];
+        var W = 340, rowH = 52, H = rowH * 3 + 8, labelW = 74, valW = 62;
+        var iw = W - labelW - valW;
+        var maxAbs = 0.05;
+        items.forEach(function (it) { if (it[1] !== null) maxAbs = Math.max(maxAbs, Math.abs(it[1])); });
+        var zeroX = labelW + iw / 2;
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"CAGR棒グラフ\">";
+        out += "<line x1=\"" + zeroX + "\" y1=\"4\" x2=\"" + zeroX + "\" y2=\"" + (H - 4) + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>";
+        items.forEach(function (it, i) {
+          var y = 8 + i * rowH, bh = 20;
+          out += "<text class=\"axis\" x=\"0\" y=\"" + (y + bh - 5) + "\">" + it[0] + "</text>";
+          if (it[1] === null) {
+            out += "<text class=\"axis\" x=\"" + (labelW + 4) + "\" y=\"" + (y + bh - 5) + "\">データなし</text>";
+          } else {
+            var w = Math.abs(it[1]) / maxAbs * (iw / 2);
+            var x = it[1] >= 0 ? zeroX : zeroX - w;
+            var color = it[1] >= 0.03 ? "var(--good)" : it[1] >= 0.01 ? "var(--slow)" : "var(--flat)";
+            out += "<rect x=\"" + x + "\" y=\"" + y + "\" width=\"" + Math.max(w, 2) + "\" height=\"" + bh + "\" rx=\"4\" fill=\"" + color + "\"/>" +
+              "<text class=\"val\" x=\"" + (W - 2) + "\" y=\"" + (y + bh - 5) + "\" text-anchor=\"end\">" + fmtPct(it[1]) + "</text>";
+          }
+        });
+        return out + "</svg>";
+      }
+
+      function yoyChartSVG(s) {
+        var fys = Object.keys(s.series).map(Number).sort(function (a, b) { return a - b; });
+        var items = [];
+        fys.forEach(function (f) {
+          var prev = s.series[f - 1];
+          if (prev) items.push({ fy: f, pct: (s.series[f] - prev) / prev, diff: s.series[f] - prev });
+        });
+        if (!items.length) return "<p class=\"viz-sub\">前年比データがありません。</p>";
+        var W = 560, H = 170, pl = 36, pr = 10, pt = 18, pb = 28, iw = W - pl - pr, ih = H - pt - pb;
+        var maxAbs = 0.05;
+        items.forEach(function (it) { maxAbs = Math.max(maxAbs, Math.abs(it.pct)); });
+        var zeroY = pt + ih / 2;
+        var bw = Math.min(iw / items.length * 0.62, 34);
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"前年比の棒グラフ\">";
+        out += "<line x1=\"" + pl + "\" y1=\"" + zeroY + "\" x2=\"" + (W - pr) + "\" y2=\"" + zeroY + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>";
+        items.forEach(function (it, i) {
+          var cx = pl + iw * (i + 0.5) / items.length;
+          var h = Math.abs(it.pct) / maxAbs * (ih / 2);
+          var isToken = it.diff <= 1.0 + 1e-9;
+          var col = isToken ? "var(--warn)" : "var(--good)";
+          var y = it.pct >= 0 ? zeroY - h : zeroY;
+          out += "<rect x=\"" + (cx - bw / 2) + "\" y=\"" + y + "\" width=\"" + bw + "\" height=\"" + Math.max(h, 2) + "\" rx=\"3\" fill=\"" + col + "\"/>" +
+            "<text class=\"val\" x=\"" + cx + "\" y=\"" + (it.pct >= 0 ? y - 5 : y + h + 13) + "\" text-anchor=\"middle\" style=\"font-size:10.5px\">" + fmtPct(it.pct) + "</text>" +
+            "<text class=\"axis\" x=\"" + cx + "\" y=\"" + (H - 6) + "\" text-anchor=\"middle\">" + it.fy + "</text>";
+        });
+        return out + "</svg><p class=\"cmp-note\">オレンジの棒は増配幅が1円以下の「トークン年」。伸びが小さくなっている年が一目で分かります。</p>";
+      }
+
+      /* ---------- valuation (ROE x PBR scatter + per-stock detail) ---------- */
+      function fmtX(v, d) { return v === null || v === undefined ? "—" : v.toFixed(d === undefined ? 2 : d); }
+
+      function scatterSVG() {
+        var W = 560, H = 360, pl = 44, pr = 16, pt = 18, pb = 36;
+        var iw = W - pl - pr, ih = H - pt - pb;
+        var xMax = 25, yMax = 5;
+        function X(roe) { return pl + iw * roe / xMax; }
+        function Y(pbr) { return pt + ih * (1 - pbr / yMax); }
+        /* theoretical (justified) PBR = (ROE - g) / (r - g), with r = 8%, g = 2%:
+           ROE 8% -> 1.0x, 14% -> 2.0x, 20% -> 3.0x, 5% -> 0.5x */
+        function theoPBR(roe) { return (roe - 2) / 6; }
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"ROEとPBRの散布図\">";
+        /* shading vs the theoretical-PBR line: below = cheap candidates, above = richly valued */
+        out += "<polygon points=\"" + (pl + iw) + "," + pt + " " + (pl + iw) + "," + Y(theoPBR(xMax)).toFixed(1) + " " + X(2).toFixed(1) + "," + (pt + ih) + " " + pl + "," + (pt + ih) + " " + pl + "," + pt + "\" fill=\"var(--flat)\" opacity=\"0.05\"/>";
+        out += "<polygon points=\"" + X(2).toFixed(1) + "," + (pt + ih) + " " + (pl + iw) + "," + (pt + ih) + " " + (pl + iw) + "," + Y(theoPBR(xMax)).toFixed(1) + "\" fill=\"var(--good)\" opacity=\"0.09\"/>";
+        var gx, gy;
+        for (gx = 0; gx <= xMax; gx += 5) {
+          out += "<line x1=\"" + X(gx) + "\" y1=\"" + pt + "\" x2=\"" + X(gx) + "\" y2=\"" + (pt + ih) + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>" +
+            "<text class=\"axis\" x=\"" + X(gx) + "\" y=\"" + (H - 20) + "\" text-anchor=\"middle\">" + gx + "%</text>";
+        }
+        for (gy = 0; gy <= yMax; gy += 1) {
+          out += "<line x1=\"" + pl + "\" y1=\"" + Y(gy) + "\" x2=\"" + (pl + iw) + "\" y2=\"" + Y(gy) + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>" +
+            "<text class=\"axis\" x=\"" + (pl - 6) + "\" y=\"" + (Y(gy) + 4) + "\" text-anchor=\"end\">" + gy + "倍</text>";
+        }
+        out += "<text class=\"axis\" x=\"" + (pl + iw / 2) + "\" y=\"" + (H - 4) + "\" text-anchor=\"middle\">ROE（%）→</text>";
+        /* reference lines: ROE 8% (typical cost-of-capital yardstick) and PBR 1x */
+        out += "<line x1=\"" + X(8) + "\" y1=\"" + pt + "\" x2=\"" + X(8) + "\" y2=\"" + (pt + ih) + "\" stroke=\"var(--warn)\" stroke-width=\"1.5\" stroke-dasharray=\"5 4\"/>" +
+          "<text class=\"ref-label\" x=\"" + (X(8) + 5) + "\" y=\"" + (pt + 13) + "\">ROE 8%</text>";
+        out += "<line x1=\"" + pl + "\" y1=\"" + Y(1) + "\" x2=\"" + (pl + iw) + "\" y2=\"" + Y(1) + "\" stroke=\"var(--warn)\" stroke-width=\"1.5\" stroke-dasharray=\"5 4\"/>" +
+          "<text class=\"ref-label\" x=\"" + (pl + iw - 4) + "\" y=\"" + (Y(1) - 6) + "\" text-anchor=\"end\">PBR 1倍</text>";
+        /* theoretical PBR line: below it PBR is low for the ROE, above it PBR is high for the ROE */
+        var tAng = Math.atan2(-(Y(theoPBR(xMax)) - Y(0)), X(xMax) - X(2)) * 180 / Math.PI;
+        var tLx = X(19.5), tLy = Y(theoPBR(19.5));
+        out += "<line x1=\"" + X(2).toFixed(1) + "\" y1=\"" + Y(0) + "\" x2=\"" + X(xMax) + "\" y2=\"" + Y(theoPBR(xMax)).toFixed(1) + "\" stroke=\"var(--accent-strong)\" stroke-width=\"2.5\"/>" +
+          "<text class=\"theory-label\" x=\"" + tLx.toFixed(1) + "\" y=\"" + (tLy - 9).toFixed(1) + "\" text-anchor=\"middle\" transform=\"rotate(" + tAng.toFixed(1) + " " + tLx.toFixed(1) + " " + (tLy - 9).toFixed(1) + ")\">理論PBR（r=8%・g=2%）</text>";
+        /* region labels relative to the theoretical line */
+        out += "<text class=\"region-up\" x=\"" + (pl + 8) + "\" y=\"" + Y(2.7).toFixed(1) + "\">線より上：ROEの割にPBRが高い＝高評価・割高寄り</text>";
+        out += "<text class=\"region-down\" x=\"" + (pl + iw - 4) + "\" y=\"" + Y(0.55).toFixed(1) + "\" text-anchor=\"end\">線より下：ROEの割にPBRが低い＝割安候補</text>";
+        /* corner readings */
+        out += "<text class=\"quad\" x=\"" + (pl + 6) + "\" y=\"" + (pt + 13) + "\">割高注意</text>";
+        out += "<text class=\"quad\" x=\"" + (pl + iw - 4) + "\" y=\"" + (pt + 13) + "\" text-anchor=\"end\">高評価（成長期待込み）</text>";
+        out += "<text class=\"quad\" x=\"" + (pl + 6) + "\" y=\"" + (pt + ih - 6) + "\">1倍割れでも割安とは限らない</text>";
+        out += "<text class=\"quad\" x=\"" + (pl + iw - 4) + "\" y=\"" + (pt + ih - 6) + "\" text-anchor=\"end\">稼ぐ力の割に評価が低い</text>";
+        Object.keys(VALUATION.stocks).forEach(function (code) {
+          var v = VALUATION.stocks[code];
+          var cx = X(v.roe), cy = Y(v.pbr);
+          var sel = state.selected === code;
+          var lx = cx + 11, anchor = "start";
+          if (cx > pl + iw - 90) { lx = cx - 11; anchor = "end"; }
+          out += "<g data-code=\"" + esc(code) + "\" style=\"cursor:pointer\">" +
+            "<circle cx=\"" + cx + "\" cy=\"" + cy + "\" r=\"" + (sel ? 9 : 7) + "\" fill=\"" + (sel ? "var(--warn)" : "var(--accent)") + "\" stroke=\"var(--surface)\" stroke-width=\"2\"/>" +
+            "<text class=\"pt-label\" x=\"" + lx + "\" y=\"" + (cy + 4) + "\" text-anchor=\"" + anchor + "\">" + esc(v.name) + "</text></g>";
+        });
+        return out + "</svg>";
+      }
+
+      function renderValuation() {
+        var el = els.valuation;
+        if (!state.stocks.length) { el.className = "val-section"; el.innerHTML = ""; return; }
+        var codes = Object.keys(VALUATION.stocks);
+        var rows = codes.map(function (code) {
+          var v = VALUATION.stocks[code];
+          return "<tr data-code=\"" + esc(code) + "\" class=\"" + (state.selected === code ? "selected" : "") + "\">" +
+            "<td><span class=\"stock-name\">" + esc(v.name) + "</span></td>" +
+            "<td>" + fmtX(v.per) + "倍</td><td>" + fmtX(v.pbr) + "倍</td><td>" + fmtX(v.roe) + "%</td>" +
+            "<td>" + fmtX(v.perRoe) + "倍</td></tr>";
+        }).join("");
+        el.innerHTML =
+          "<div class=\"val-grid\">" +
+          "<div class=\"viz-card scatter-wrap\"><h2>稼ぐ力と評価 — ROE × PBR</h2>" +
+          "<p class=\"viz-sub\">横軸がROE（稼ぐ力）、縦軸がPBR（評価）。実線は理論PBR ＝（ROE − g）÷（r − g）に資本コスト r=8%・成長率 g=2% を入れた目安の線で、線より下が「割安候補」の領域です。破線は ROE 8% と PBR 1倍。点や表の行を選ぶと下に詳細が出ます。バリュエーションは " + VALUATION.fetchedAt + " 取得のスナップショット（サンプル5銘柄分のみ）です。</p>" +
+          scatterSVG() + "</div>" +
+          "<div class=\"viz-card\"><h2>PER・PBRの読み方</h2>" +
+          "<p class=\"val-note\"><strong>PBR ＝ PER × ROE</strong> という関係があります。PBRが低い理由は、「稼ぐ力（ROE）が低い」か「利益への期待（PER）が低い」かのどちらかです。右の表の「PER×ROE」が実際のPBRとほぼ一致するかで確認できます。</p>" +
+          "<p class=\"val-note\">そのため、<strong>ROEが低い銘柄のPBR1倍割れは、割安とは限りません</strong>。ROEが資本コストの目安（8%前後）を下回る会社では、1倍割れが妥当な評価である場合があります。逆に、ROEが高いのにPBRが相対的に低い銘柄は、評価が抑えられている候補として見ることができます。</p>" +
+          "<p class=\"val-note\"><strong>理論PBR（妥当PBR）の線</strong>は、理論PBR ＝（ROE − 成長率g）÷（資本コストr − g）に r=8%・g=2% を入れたもので、ROE 8%→1.0倍、14%→2.0倍、20%→3.0倍、5%→0.5倍を通る右上がりの直線です。<strong>線より下は「ROEの割にPBRが低い＝割安候補」</strong>、線より上は「ROEの割にPBRが高い＝高評価・割高寄り」と読みます。ただしこれは一般的な目安で、業種や金利環境によって前提（r・g）は動きます。<strong>割安候補は買い推奨ではありません</strong>。</p>" +
+          "<table class=\"val-table\"><thead><tr><th>銘柄</th><th>PER</th><th>PBR</th><th>ROE</th><th>PER×ROE</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+          "<p class=\"cmp-note\">例：カケルキャピタルはPBR 0.92倍ですが、ROE 7.50%と低く PER×ROE ≒ 0.92倍とほぼ一致します。理論PBRは約0.92倍で実績は線の上にあり、1倍割れでも割安候補ではありません。逆にソラ部品は理論約3.00倍に対し実績2.50倍で線の下＝割安候補の位置、ノゾミ通信は理論約2.26倍と実績2.67倍がほぼ一致して線の上＝ほぼ妥当な水準です。</p>" +
+          "</div></div>";
+        el.className = "val-section show";
+        Array.prototype.forEach.call(el.querySelectorAll("[data-code]"), function (node) {
+          node.addEventListener("click", function () { selectStock(node.getAttribute("data-code")); });
+        });
+      }
+
+      function yieldBandHTML(v) {
+        var lo = Math.min(v.yMin, v.yieldCur) * 0.92;
+        var hi = Math.max(v.yMax, v.yieldCur) * 1.06;
+        function P(x) { return ((x - lo) / (hi - lo) * 100).toFixed(1); }
+        var hist = v.yieldSeries.map(function (pt) {
+          return "<span class=\"yield-hist\" style=\"left:" + P(pt[1]) + "%\" title=\"FY" + pt[0] + ": " + pt[1].toFixed(2) + "%\"></span>";
+        }).join("");
+        var pos = v.yMax > v.yMin ? Math.round((v.yieldCur - v.yMin) / (v.yMax - v.yMin) * 100) : 50;
+        var rel = v.yieldCur > v.yMed ? "中央値より高く、自分の過去の中では株価が相対的に抑えられている水準です" :
+                  v.yieldCur < v.yMed ? "中央値より低く、自分の過去の中では株価が相対的に高い水準です" :
+                  "ちょうど中央値付近です";
+        return "<div class=\"yield-band\">" +
+          "<span class=\"yield-cur-label\" style=\"left:" + P(v.yieldCur) + "%\">現在 " + v.yieldCur.toFixed(2) + "%</span>" +
+          "<div class=\"yield-track\"></div>" +
+          "<div class=\"yield-range\" style=\"left:" + P(v.yMin) + "%;width:" + (P(v.yMax) - P(v.yMin)).toFixed(1) + "%\"></div>" +
+          hist +
+          "<span class=\"yield-med\" style=\"left:" + P(v.yMed) + "%\"></span>" +
+          "<span class=\"yield-cur\" style=\"left:" + P(v.yieldCur) + "%\"></span></div>" +
+          "<div class=\"yield-scale\"><span style=\"left:0\">過去最小 " + v.yMin.toFixed(2) + "%</span>" +
+          "<span style=\"left:" + P(v.yMed) + "%\">中央値 " + v.yMed.toFixed(2) + "%</span>" +
+          "<span style=\"left:100%\">過去最大 " + v.yMax.toFixed(2) + "%</span></div>" +
+          "<p class=\"cmp-note\">帯は過去の年度別利回りの範囲（最小〜最大）、黒い線が中央値、グレーの点が各年度、緑の点が現在です。現在利回りは過去レンジ内の約" + pos + "%の位置で、" + rel + "。年度別利回りは各年度末の株価（分割調整後）でDPSを割った概算です。</p>";
+      }
+
+      function valuationDetailHTML(s) {
+        var v = VALUATION.stocks[s.code];
+        if (!v) return "";
+        var theo = (v.roe - 2) / 6; /* theoretical PBR at r = 8%, g = 2% */
+        var theoRel = Math.abs(v.pbr - theo) <= theo * 0.1 ? "ほぼ理論PBRの線上にあり、妥当な水準と読めます" :
+                      v.pbr < theo ? "理論PBRの線より下にあり、割安候補の位置です" :
+                      "理論PBRの線より上にあり、高評価・割高寄りと読めます";
+        return "<div class=\"val-detail\">" +
+          "<h3>バリュエーション（" + VALUATION.fetchedAt + "取得）</h3>" +
+          "<div class=\"detail-stats\">" +
+          "<div class=\"dstat\">株価<b>" + v.price.toLocaleString("ja-JP") + "円</b></div>" +
+          "<div class=\"dstat\">PER<b>" + fmtX(v.per) + "倍</b></div>" +
+          "<div class=\"dstat\">PBR<b>" + fmtX(v.pbr) + "倍</b></div>" +
+          "<div class=\"dstat\">理論PBR（r=8%・g=2%）<b>" + fmtX(theo) + "倍</b></div>" +
+          "<div class=\"dstat\">ROE<b>" + fmtX(v.roe) + "%</b></div>" +
+          "<div class=\"dstat\">配当性向<b>" + fmtX(v.payout, 1) + "%</b></div>" +
+          "<div class=\"dstat\">現在利回り<b>" + v.yieldCur.toFixed(2) + "%</b></div>" +
+          "</div>" +
+          "<div class=\"chart-box\"><h3>配当利回り — 自分の過去との比較</h3>" + yieldBandHTML(v) + "</div>" +
+          "<p class=\"cmp-note\" style=\"margin-top:12px\">PBRの分解チェック： PER " + fmtX(v.per) + "倍 × ROE " + fmtX(v.roe) + "% ≒ " + fmtX(v.perRoe) + "倍 で、実際のPBR " + fmtX(v.pbr) + "倍とほぼ一致します。" +
+          (v.roe < 8 ? "ROEが8%を下回っているため、PBRの水準だけで割安とは判断しにくい銘柄です。" :
+           v.pbr < 1 ? "ROEは8%以上でPBRは1倍割れ — 評価が抑えられている可能性があります。" :
+           "PBRの高さはROEの高さで説明できる範囲かどうかとあわせて見てください。") +
+          "理論PBR（資本コスト8%・成長率2%と置いた一般的な目安）は " + fmtX(theo) + "倍で、実績PBR " + fmtX(v.pbr) + "倍は" + theoRel + "。前提は業種や金利で動き、割安候補は買い推奨ではありません。</p>" +
+          "</div>";
+      }
+
+      function sustainPayoutSVG(years) {
+        var W = 340, H = 212, pl = 38, pr = 10, pt = 20, pb = 28, iw = W - pl - pr, ih = H - pt - pb;
+        var maxV = 100;
+        years.forEach(function (y) { maxV = Math.max(maxV, y.payout); });
+        var yMax = Math.ceil(maxV * 1.18 / 20) * 20;
+        var step = yMax > 140 ? 50 : 25;
+        function Y(v) { return pt + ih * (1 - v / yMax); }
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"配当性向の推移グラフ\">";
+        for (var gv = 0; gv <= yMax; gv += step) {
+          out += "<line x1=\"" + pl + "\" y1=\"" + Y(gv) + "\" x2=\"" + (W - pr) + "\" y2=\"" + Y(gv) + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>" +
+            "<text class=\"axis\" x=\"" + (pl - 5) + "\" y=\"" + (Y(gv) + 4) + "\" text-anchor=\"end\">" + gv + "%</text>";
+        }
+        var bw = Math.min(iw / years.length * 0.58, 44);
+        years.forEach(function (y, i) {
+          var cx = pl + iw * (i + 0.5) / years.length;
+          var over = y.payout > 100;
+          var col = over ? "var(--flat)" : "var(--accent)";
+          out += "<rect x=\"" + (cx - bw / 2).toFixed(1) + "\" y=\"" + Y(y.payout).toFixed(1) + "\" width=\"" + bw + "\" height=\"" + Math.max(Y(0) - Y(y.payout), 2).toFixed(1) + "\" rx=\"3\" fill=\"" + col + "\"/>" +
+            "<text class=\"val\" x=\"" + cx + "\" y=\"" + (Y(y.payout) - 5).toFixed(1) + "\" text-anchor=\"middle\">" + y.payout.toFixed(1) + "%</text>" +
+            "<text class=\"axis\" x=\"" + cx + "\" y=\"" + (H - 6) + "\" text-anchor=\"middle\">FY" + y.fy + "</text>";
+        });
+        out += "<line x1=\"" + pl + "\" y1=\"" + Y(100) + "\" x2=\"" + (W - pr) + "\" y2=\"" + Y(100) + "\" stroke=\"var(--flat)\" stroke-width=\"1.8\" stroke-dasharray=\"6 4\"/>" +
+          "<text x=\"" + (W - pr) + "\" y=\"" + (Y(100) - 6) + "\" text-anchor=\"end\" style=\"font-size:11px;fill:var(--flat);font-weight:700\">100%（利益＝配当）</text>";
+        return out + "</svg>";
+      }
+
+      function sustainFcfSVG(years) {
+        var W = 340, H = 212, pl = 38, pr = 10, pt = 20, pb = 28, iw = W - pl - pr, ih = H - pt - pb;
+        var maxV = 1;
+        years.forEach(function (y) { if (y.fcf !== null) maxV = Math.max(maxV, y.fcf); });
+        var yMax = Math.ceil(maxV * 1.2 * 2) / 2;
+        function Y(v) { return pt + ih * (1 - v / yMax); }
+        var out = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"FCFカバーの推移グラフ\">";
+        for (var gv = 0; gv <= yMax + 0.001; gv += 1) {
+          out += "<line x1=\"" + pl + "\" y1=\"" + Y(gv) + "\" x2=\"" + (W - pr) + "\" y2=\"" + Y(gv) + "\" stroke=\"var(--chart-grid)\" stroke-width=\"1\"/>" +
+            "<text class=\"axis\" x=\"" + (pl - 5) + "\" y=\"" + (Y(gv) + 4) + "\" text-anchor=\"end\">" + gv.toFixed(0) + "倍</text>";
+        }
+        var bw = Math.min(iw / years.length * 0.58, 44);
+        years.forEach(function (y, i) {
+          var cx = pl + iw * (i + 0.5) / years.length;
+          if (y.fcf === null) {
+            out += "<text class=\"val\" x=\"" + cx + "\" y=\"" + (Y(0) - 8) + "\" text-anchor=\"middle\" style=\"fill:var(--muted)\">データなし</text>";
+          } else {
+            var under = y.fcf < 1;
+            var col = under ? "var(--flat)" : "var(--good)";
+            out += "<rect x=\"" + (cx - bw / 2).toFixed(1) + "\" y=\"" + Y(y.fcf).toFixed(1) + "\" width=\"" + bw + "\" height=\"" + Math.max(Y(0) - Y(y.fcf), 2).toFixed(1) + "\" rx=\"3\" fill=\"" + col + "\"/>" +
+              "<text class=\"val\" x=\"" + cx + "\" y=\"" + (Y(y.fcf) - 5).toFixed(1) + "\" text-anchor=\"middle\">" + y.fcf.toFixed(2) + "倍</text>";
+          }
+          out += "<text class=\"axis\" x=\"" + cx + "\" y=\"" + (H - 6) + "\" text-anchor=\"middle\">FY" + y.fy + "</text>";
+        });
+        out += "<line x1=\"" + pl + "\" y1=\"" + Y(1) + "\" x2=\"" + (W - pr) + "\" y2=\"" + Y(1) + "\" stroke=\"var(--flat)\" stroke-width=\"1.8\" stroke-dasharray=\"6 4\"/>" +
+          "<text x=\"" + (W - pr) + "\" y=\"" + (Y(1) - 6) + "\" text-anchor=\"end\" style=\"font-size:11px;fill:var(--flat);font-weight:700\">1倍（FCF＝配当）</text>";
+        return out + "</svg>";
+      }
+
+      function sustainabilityDetailHTML(s) {
+        var su = SUSTAINABILITY.stocks[s.code];
+        if (!su) return "";
+        var years = su.years;
+        var first = years[0], last = years[years.length - 1];
+        var overN = years.filter(function (y) { return y.payout > 100; }).length;
+        var underN = years.filter(function (y) { return y.fcf !== null && y.fcf < 1; }).length;
+        var fcfVals = years.filter(function (y) { return y.fcf !== null; }).map(function (y) { return y.fcf; });
+        var summary = "配当性向は FY" + first.fy + " の " + first.payout.toFixed(1) + "% から FY" + last.fy + " の " + last.payout.toFixed(1) + "% へ推移しています。";
+        if (overN) summary += "性向が100%を超えた年が " + overN + "年あります（その年の利益を超えて配当を出した年です）。";
+        if (su.fcfNA) summary += "FCFカバーは対象外のため、性向の水準と安定度だけで見てください。";
+        else if (fcfVals.length) {
+          summary += "FCFカバーは " + Math.min.apply(null, fcfVals).toFixed(2) + "〜" + Math.max.apply(null, fcfVals).toFixed(2) + "倍の範囲で、";
+          summary += underN ? "1倍を下回った年が " + underN + "年あります（その年のフリーキャッシュフローだけでは配当を賄えていなかった年です）。" : "表示期間ではすべて1倍以上です。";
+        }
+        var fcfBox;
+        if (su.fcfNA) {
+          fcfBox = "<div class=\"chart-box\"><h4>FCFカバー（FCF/株 ÷ DPS）</h4><p class=\"chart-sub\">1倍以上で、その年のフリーキャッシュフローで配当を賄えた目安です。</p>" +
+            "<div class=\"sustain-na\"><strong>対象外</strong>リース・金融業では、フリーキャッシュフロー自体が配当の原資を表さないため、FCFカバーは表示しません。この銘柄は配当性向のみで見てください。</div></div>";
+        } else {
+          fcfBox = "<div class=\"chart-box\"><h4>FCFカバー（FCF/株 ÷ DPS）</h4><p class=\"chart-sub\">赤い破線が1倍。1倍未満（赤い棒）は、その年のFCFだけでは配当を賄えていない年です。</p>" + sustainFcfSVG(years) +
+            (su.fcfMissingNote ? "<p class=\"cmp-note\">" + esc(su.fcfMissingNote) + "</p>" : "") + "</div>";
+        }
+        return "<div class=\"sustain-detail\">" +
+          "<h3>配当の持続性（" + SUSTAINABILITY.fetchedAt + "取得）</h3>" +
+          "<p class=\"sustain-summary\">増配が続いているかとは別に、「今の配当を利益とキャッシュで無理なく払えているか」を見るビューです。" + summary + "</p>" +
+          "<div class=\"detail-stats\">" +
+          "<div class=\"dstat\">最新 配当性向（FY" + last.fy + "）<b>" + last.payout.toFixed(1) + "%</b></div>" +
+          "<div class=\"dstat\">性向の範囲<b>" + Math.min.apply(null, years.map(function (y) { return y.payout; })).toFixed(1) + "〜" + Math.max.apply(null, years.map(function (y) { return y.payout; })).toFixed(1) + "%</b></div>" +
+          (su.fcfNA ? "<div class=\"dstat\">FCFカバー<b>対象外</b></div>" :
+            fcfVals.length ? "<div class=\"dstat\">FCFカバー（最新データ年）<b>" + fcfVals[fcfVals.length - 1].toFixed(2) + "倍</b></div>" : "") +
+          "<div class=\"dstat\">性向100%超の年<b>" + overN + "年</b></div>" +
+          (su.fcfNA ? "" : "<div class=\"dstat\">FCFカバー1倍未満の年<b>" + underN + "年</b></div>") +
+          "</div>" +
+          "<div class=\"sustain-grid\">" +
+          "<div class=\"chart-box\"><h4>配当性向の推移（DPS ÷ EPS）</h4><p class=\"chart-sub\">赤い破線が100%。100%超（赤い棒）は、その年の利益を超えて配当を出した年です。</p>" + sustainPayoutSVG(years) + "</div>" +
+          fcfBox +
+          "</div>" +
+          "<ul class=\"sustain-notes\">" +
+          "<li><strong>配当性向100%超</strong>は、その年の利益を超えて配当を出した年です（例：ハルカ食品はFY2023に87.4%まで上がりましたが、翌年は56.0%に戻っています）。1年だけなら内部留保で賄えますが、続くと持続性に注意が必要です。</li>" +
+          "<li><strong>FCFカバー1倍未満</strong>は、その年のフリーキャッシュフローだけでは配当を賄えていない年です（例：ハルカ食品はFY2022に0.85倍と、1倍未満の年があります）。手元現金や借入で補っている状態なので、単年で即危険とは限りませんが、繰り返すかどうかを見ます。</li>" +
+          "<li><strong>組み合わせで見る</strong>：配当性向が上がり続け、同時にFCFカバーが下がり続けていると、持続性への注意度が上がります。逆に性向が安定し、カバーが1倍を厚く上回る年が続けば、無理のない配当と言えます（例：ユメ流通は性向52.9〜54.5%の範囲で安定しています）。</li>" +
+          "<li>いずれも<strong>過去データに基づく目安で、減配の予測ではありません</strong>。業績見通しや会社の配当方針は決算短信などで別途確認してください。</li>" +
+          "</ul></div>";
+      }
+
+      function safeBadge(flag) {
+        if (flag === "ok") return "<span class=\"safe-badge ok\">問題なし</span>";
+        if (flag === "caution") return "<span class=\"safe-badge caution\">注意</span>";
+        return "<span class=\"safe-badge ref\">参考外</span>";
+      }
+
+      function safetyDetailHTML(s) {
+        var sf = SAFETY.stocks[s.code];
+        if (!sf) return "";
+        var rows = [];
+        function row(item, value, flag, note) {
+          rows.push("<tr><td>" + item + "</td><td class=\"safe-val\">" + value + "</td>" +
+            "<td class=\"safe-flag\">" + safeBadge(flag) + "</td><td class=\"safe-note\">" + note + "</td></tr>");
+          return flag;
+        }
+        var flags = [];
+        flags.push(row("債務超過", sf.negativeEquity ? "あり（純資産マイナス）" : "なし",
+          sf.negativeEquity ? "caution" : "ok",
+          "純資産がマイナスかどうか。最も直接的な危険信号です。"));
+        flags.push(row("自己資本比率", sf.equityRatio.toFixed(1) + "%",
+          sf.financial ? "ref" : (sf.equityRatio < 10 ? "caution" : "ok"),
+          sf.financial ? "リース・金融は業態上低く出るため参考外とし、非金融向けの目安（10%未満で注意）は適用していません。"
+                        : "非金融で10%未満を「注意」の目安にしています。業種で水準が違うため絶対値ではなく同業種比較が前提です。"));
+        if (sf.financial) {
+          flags.push(row("インタレスト・カバレッジ", "—", "ref",
+            "金融業のため参考外。資金調達コストが売上原価側に入る業態で、「営業利益÷支払利息」の式では意味を持ちません。"));
+        } else {
+          flags.push(row("インタレスト・カバレッジ（営業利益÷支払利息）",
+            sf.interestCoverage >= 1000 ? sf.interestCoverage.toLocaleString("ja-JP", { maximumFractionDigits: 1 }) + "倍" : sf.interestCoverage.toFixed(1) + "倍",
+            sf.interestCoverage < 2 ? "caution" : "ok",
+            "直近年度。2倍未満が続くと利息の支払いにも窮し、借り換えが詰まりやすくなります。" + (sf.icNote ? sf.icNote : "")));
+        }
+        if (sf.financial) {
+          flags.push(row("営業キャッシュフロー", "3年連続マイナス", "ref",
+            "参考外（リース業の構造）。リース資産の取得が営業CFに含まれるため構造的にマイナスになりやすく、危険信号として扱いません。"));
+        } else {
+          flags.push(row("営業キャッシュフロー", sf.opCfAllPositive ? "取得できた全年度プラス" : "マイナス年あり",
+            sf.opCfAllPositive ? "ok" : "caution",
+            "非金融で2年以上連続マイナスを「注意」の目安にしています。利益が出ていても営業CFのマイナス続きは危ないサインです。" + (sf.opCfNote ? sf.opCfNote : "")));
+        }
+        if (sf.financial || sf.debtRepayYears === null) {
+          flags.push(row("債務償還年数（有利子負債÷営業CF）", "—", "ref",
+            "リース業は営業CFが構造的にマイナスになるため、算出対象外です。"));
+        } else {
+          flags.push(row("債務償還年数（有利子負債÷営業CF）", sf.debtRepayYears.toFixed(1) + "年",
+            sf.debtRepayYears > 10 ? "caution" : "ok",
+            "10年超を「注意」の目安にしています。今の稼ぎで借入を返し切るまでの重さです。"));
+        }
+        flags.push(row("流動比率", sf.currentRatio.toFixed(2), "ref",
+          "合否判定には使わず数値のみ表示。業態で水準が大きく違います" +
+          (s.code === "DUM-B" ? "（ノゾミ通信は前受金などが流動負債に入るため低く出ます）" : "") + "。短期の支払い余力の参考にしてください。"));
+        var okN = flags.filter(function (f) { return f === "ok"; }).length;
+        var cauN = flags.filter(function (f) { return f === "caution"; }).length;
+        var refN = flags.filter(function (f) { return f === "ref"; }).length;
+        return "<div class=\"safety-detail\">" +
+          "<h3>安全度チェック（" + SAFETY.fetchedAt + "取得）</h3>" +
+          "<p class=\"safety-summary\">割安かどうかとは別に、倒産リスク側を見るチェックです。判定は <strong>問題なし " + okN + "件</strong>・<strong>注意 " + cauN + "件</strong>・参考外 " + refN + "件でした。" +
+          (cauN === 0 ? "今回の対象項目に危険信号はありません。" : "「注意」の項目は決算短信・有価証券報告書で中身を確認してください。") + "</p>" +
+          "<table class=\"safe-table\"><thead><tr><th>項目</th><th style=\"text-align:right\">実績値</th><th style=\"text-align:right\">判定</th><th>見方・注記</th></tr></thead><tbody>" +
+          rows.join("") + "</tbody></table>" +
+          "<p class=\"cmp-note\" style=\"margin-top:10px\">安全度は倒産・上場廃止リスクの目安で、絶対ではありません。継続企業の前提に関する注記（GC注記）や監査意見、上場維持基準（流通株式時価総額・流通株式比率など）はこのデータでは見ていません。また実際の上場廃止にはMBOや完全子会社化など業績と無関係なものも多く、指標だけでは防ぎきれません。</p>" +
+          "</div>";
+      }
+
+      function renderDetail() {
+        var s = null;
+        state.stocks.forEach(function (x) { if (x.code === state.selected) s = x; });
+        if (!s) { els.detail.className = "detail"; els.detail.innerHTML = ""; return; }
+        var fys = Object.keys(s.series).map(Number).sort(function (a, b) { return a - b; });
+        var rowsHtml = fys.slice().reverse().map(function (f) {
+          var prev = s.series[f - 1], cur = s.series[f];
+          var diff = prev !== undefined ? cur - prev : null;
+          var pct = prev ? diff / prev : null;
+          var token = diff !== null && diff <= 1.0 + 1e-9;
+          return "<tr><td>FY" + f + "</td><td class=\"num\">" + fmtYen(cur) + "</td>" +
+            "<td class=\"num\">" + (diff === null ? "—" : fmtSignedYen(diff)) + (token ? "<span class=\"token-dot\">トークン年</span>" : "") + "</td>" +
+            "<td class=\"num\">" + (pct === null ? "—" : fmtPct(pct)) + "</td></tr>";
+        }).join("");
+        var firstDps = s.series[fys[0]];
+        var multiple = firstDps > 0 ? (s.lastDps / firstDps) : null;
+        els.detail.innerHTML =
+          "<h2>" + esc(s.name) + " <span class=\"stock-code\">" + esc(s.code) + "</span></h2>" +
+          "<p class=\"dsub\">FY" + fys[0] + "〜FY" + s.lastFy + " の実績DPS（分割調整後）／ 判定: " +
+          "<span class=\"verdict " + verdictClass(s.judgement) + "\">" + s.judgement + "</span>" +
+          (s.decel ? " <span class=\"flag\">減速注意</span>" : "") + "</p>" +
+          "<div class=\"detail-stats\">" +
+          "<div class=\"dstat\">最新DPS（FY" + s.lastFy + "）<b>" + fmtYen(s.lastDps) + "</b></div>" +
+          "<div class=\"dstat\">期間中の伸び<b>" + (multiple === null ? "—" : multiple.toFixed(2) + "倍") + "</b></div>" +
+          "<div class=\"dstat\">3年CAGR<b>" + fmtPct(s.cagr3) + "</b></div>" +
+          "<div class=\"dstat\">連続増配<b>" + s.streak + "年</b></div>" +
+          "<div class=\"dstat\">トークン年（直近5年）<b>" + s.tokenYears + "年</b></div>" +
+          "</div>" +
+          "<div class=\"charts\">" +
+          "<div class=\"chart-box\"><h3>年間DPSの推移（円）— オレンジの点はトークン年</h3>" + lineChartSVG(s) + "</div>" +
+          "<div class=\"chart-box\"><h3>CAGR（年平均成長率）</h3>" + cagrBarSVG(s) + "</div>" +
+          "</div>" +
+          "<div class=\"chart-box\" style=\"margin-top:20px\"><h3>前年比の伸び（%）</h3>" + yoyChartSVG(s) + "</div>" +
+          "<div class=\"yearly\"><table><thead><tr><th>年度</th><th>DPS</th><th>前年比（円）</th><th>前年比（%）</th></tr></thead>" +
+          "<tbody>" + rowsHtml + "</tbody></table></div>" +
+          valuationDetailHTML(s) + sustainabilityDetailHTML(s) + safetyDetailHTML(s);
+        els.detail.className = "detail show";
+      }
+
+      function renderAll() { renderMeta(); renderOverview(); renderList(); renderDetail(); renderValuation(); }
+      function selectStock(code) {
+        state.selected = state.selected === code ? null : code;
+        renderOverview(); renderList(); renderDetail(); renderValuation();
+        if (state.selected) els.detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function showNotice(kind, msg) {
+        els.notice.className = "notice " + kind;
+        els.notice.textContent = msg;
+      }
+
+      /* ---------- events ---------- */
+      function handleFile(file) {
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            loadCSV(String(reader.result), file.name);
+            showNotice("ok", "読み込みました: " + file.name + "（" + state.stocks.length + "銘柄）");
+          } catch (e) {
+            showNotice("error", e.message);
+          }
+        };
+        reader.onerror = function () { showNotice("error", "ファイルの読み込みに失敗しました。"); };
+        reader.readAsText(file, "UTF-8");
+      }
+      $("pickBtn").addEventListener("click", function () { els.fileInput.click(); });
+      els.fileInput.addEventListener("change", function () {
+        handleFile(els.fileInput.files[0]);
+        els.fileInput.value = "";
+      });
+      ["dragenter", "dragover"].forEach(function (ev) {
+        els.dropzone.addEventListener(ev, function (e) { e.preventDefault(); els.dropzone.classList.add("drag"); });
+      });
+      ["dragleave", "drop"].forEach(function (ev) {
+        els.dropzone.addEventListener(ev, function (e) { e.preventDefault(); els.dropzone.classList.remove("drag"); });
+      });
+      els.dropzone.addEventListener("drop", function (e) {
+        var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        handleFile(f);
+      });
+
+      $("sampleBtn").addEventListener("click", function () {
+        try {
+          loadCSV(SAMPLE_CSV, "サンプル（架空・5銘柄）");
+          showNotice("ok", "サンプルデータを読み込みました。行やカードを選ぶと詳細グラフが出ます。");
+        } catch (e) { showNotice("error", e.message); }
+      });
+      $("downloadSampleBtn").addEventListener("click", function () {
+        var blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = "dividends_snapshot_sample.csv";
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      });
+      $("clearBtn").addEventListener("click", function () {
+        state.stocks = []; state.selected = null; state.sourceLabel = "";
+        state.fetchedDates = []; state.totalRows = 0; state.skippedRows = 0;
+        els.notice.className = "notice"; els.notice.textContent = "";
+        renderAll();
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll(".fchip[data-judge]"), function (chip) {
+        chip.addEventListener("click", function () {
+          var j = chip.getAttribute("data-judge");
+          var on = chip.getAttribute("aria-pressed") !== "true";
+          chip.setAttribute("aria-pressed", String(on));
+          state.filters[j] = on;
+          renderOverview(); renderList();
+        });
+      });
+      els.decelChip.addEventListener("click", function () {
+        state.decelOnly = els.decelChip.getAttribute("aria-pressed") !== "true";
+        els.decelChip.setAttribute("aria-pressed", String(state.decelOnly));
+        renderOverview(); renderList();
+      });
+      els.query.addEventListener("input", function () { state.query = els.query.value; renderOverview(); renderList(); });
+      els.sortSel.addEventListener("change", function () { state.sort = els.sortSel.value; renderOverview(); renderList(); });
+
+      /* Open with the sample already drawn, so the graphs are visible at a glance.
+         The user's own CSV replaces it via the upload area above. */
+      try {
+        loadCSV(SAMPLE_CSV, "サンプル（架空・5銘柄）");
+        state.selected = "DUM-A";
+        renderAll();
+        showNotice("ok", "サンプル（5銘柄）を表示中です。上の比較グラフや一覧の行を選ぶと詳細が見られます。自分のCSVを読み込むと差し替わります。");
+      } catch (e) { /* sample is static; ignore */ }
+    })();
+    </script>
+    <script data-goatcounter="https://dividend-checker.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  </body>
+</html>
